@@ -31,6 +31,7 @@ def cd_project_root() -> Path:
     in JupyterLab and we expect the current working directory to be the 
     project root.
     """
+    # this is absolute.
     cwd = Path.cwd()
     logger.info(f'CWD Before changing: {cwd}')
     found = False
@@ -58,7 +59,7 @@ def append_src_to_path(root: Path):
     """
     src = root / 'src'
     for p in sys.path:
-        path = Path(p)
+        path = Path(p).resolve()
         if src == path:
             logger.info(f'{src} directory has already been in sys.path')
             return
