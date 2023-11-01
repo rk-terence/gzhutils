@@ -1,4 +1,4 @@
-name: Create Release & Upload Python Package
+name: Create Release & Publish to PYPI
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  deploy:
+  release and publish:
 
     runs-on: ubuntu-latest
 
