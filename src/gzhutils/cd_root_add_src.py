@@ -67,5 +67,4 @@ def append_src_to_path(root: Path):
     logger.info(f'Appended {src} to sys.path')
 
 
-root = cd_project_root()
-sys.path.append(str(root / 'src'))
+append_src_to_path(cd_project_root())
