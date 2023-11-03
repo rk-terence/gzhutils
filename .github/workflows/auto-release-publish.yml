@@ -33,6 +33,8 @@ jobs:
         CIBW_BUILD: cp310-manylinux* cp311-manylinux* cp312-manylinux*
         CIBW_ARCHS: x86_64
         # CIBW_SKIP: pp*
+    - name: Add source release
+      run: python setup.py sdist
     - name: Release package
       uses: "marvinpinto/action-automatic-releases@latest"
       with: 
