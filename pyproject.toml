@@ -21,6 +21,3 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/rk-terence/gzhutils"
 "Bug Tracker" = "https://github.com/rk-terence/gzhutils/issues"
-
-[tool.pytest.ini_options]
-pythonpath = 'src'
