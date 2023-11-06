@@ -17,6 +17,8 @@ import sys
 from pathlib import Path
 import logging
 
+from .miscellaneous import get_project_root
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,26 +42,12 @@ def cd_project_root() -> Path:
     in JupyterLab and we expect the current working directory to be the 
     project root.
     """
-    # this is absolute.
-    cwd = Path.cwd()
-    logger.warning(f'CWD Before changing: {cwd}')
-    found = False
-    while not found:
-        iter = filter(
-            lambda x: x.name in ('src', '.git'), 
-            cwd.glob('*')
-        )
-        try:
-            next(iter); next(iter)
-        except StopIteration:
-            cwd = cwd.parent
-        else:
-            found = True
+    logger.warning(f'CWD Before changing: {Path.cwd()}')
+    proot = get_project_root()
+    os.chdir(proot)
+    logger.warning(f'CWD After changing: {proot}')
 
-    os.chdir(cwd)
-    logger.warning(f'CWD After changing: {cwd}')
-
-    return cwd
+    return proot
 
 
 def append_src_to_path(root: Path):

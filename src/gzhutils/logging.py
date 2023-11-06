@@ -15,9 +15,12 @@ import ctypes
 import tempfile
 import platform
 from typing import (
-    Self, Any, Mapping, Literal, TextIO, TypedDict, Unpack, Sequence, Final
+    Self, Any, Mapping, Literal, TextIO, TypedDict, Unpack, Sequence, Final,
+    Callable
 )
 from contextlib import contextmanager, redirect_stdout
+
+from .miscellaneous import InfiniteTimer
 
 
 type Logger = logging.Logger
@@ -266,22 +269,54 @@ def redirect_all_stdout(
         )
 
 
-class LoggerFile(TextIO):
-    def __init__(self: Self, logger: Logger, level: Level) -> None:
+class _LoggerFile(TextIO):
+    def __init__(
+            self: Self, 
+            logger: Logger, 
+            level: Level,
+            write_to_stdout: bool = False
+    ) -> None:
         self.logger = logger
         self.level = level
+        self.write_to_stdout = write_to_stdout
+
+        self.stdout = sys.stdout
     
     def write(self, msg: str):
         self.logger.log(_normalize_level(self.level), msg)
+        if self.write_to_stdout:
+            self.stdout.write(msg)
     
     def flush(self):
-        pass
+        if self.write_to_stdout:
+            self.stdout.flush()
 
 
 @contextmanager
-def redirect_stdout_to_logger(logger: Logger, level: Level):
-    with redirect_stdout(LoggerFile(logger, level)):
+def redirect_stdout_to_logger(
+        logger: Logger, 
+        level: Level,
+        keep_stdout: bool = False
+):
+    with redirect_stdout(
+            _LoggerFile(logger, level, write_to_stdout=keep_stdout)
+    ):
         yield
+
+
+def log_msg_each_interval(
+        logger: Logger, 
+        interval: float = 60,
+        level: Level = logging.INFO,
+        msg: str = "I am alive"
+):
+    def callback(logger: Logger, level: Level, msg: str) -> None:
+        logger.log(_normalize_level(level), msg)
+    
+    return InfiniteTimer(
+        interval=interval,
+        callback=callback,
+    ).run(logger, level, msg)
 
 
 # configure the logger for this package.
