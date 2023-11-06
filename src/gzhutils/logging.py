@@ -253,7 +253,7 @@ def redirect_all_stdout(
         yield
     captured_stdout = f.getvalue().decode("utf-8")
     
-    if isinstance(logger_or_file, Logger):
+    if isinstance(logger_or_file, logging.Logger):
         logger_or_file.log(_normalize_level(level), captured_stdout)
     elif isinstance(logger_or_file, io.TextIOBase):
         print(captured_stdout, end='', file=logger_or_file)
