@@ -79,6 +79,7 @@ def _configure_logger(
                 handler.setFormatter(fmt)
             else:
                 handler.setFormatter(logging.Formatter(fmt))
+            logger.addHandler(handler)
 
 
 def configure_logger(

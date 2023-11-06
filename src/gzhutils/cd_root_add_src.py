@@ -1,7 +1,16 @@
 """
 NOTE: importing this module will cause the change of current directory
 and python search path.
+
 USE WITH CARE.
+
+The current working directory will be changed to the closest 
+parent directory that contains both "src" and ".git" entries. 
+I assume the folder with such entries to be the root directory
+of your project.
+
+The python search path (`sys.path`) will be modified. 
+Specifically, the src directory will be added to it if it is not in yet.
 """
 import os
 import sys
@@ -33,7 +42,7 @@ def cd_project_root() -> Path:
     """
     # this is absolute.
     cwd = Path.cwd()
-    logger.info(f'CWD Before changing: {cwd}')
+    logger.warning(f'CWD Before changing: {cwd}')
     found = False
     while not found:
         iter = filter(
@@ -48,7 +57,7 @@ def cd_project_root() -> Path:
             found = True
 
     os.chdir(cwd)
-    logger.info(f'CWD After changing: {cwd}')
+    logger.warning(f'CWD After changing: {cwd}')
 
     return cwd
 
@@ -65,7 +74,7 @@ def append_src_to_path(root: Path):
             return
     
     sys.path.append(str(src))
-    logger.info(f'Appended {src} to sys.path')
+    logger.warning(f'Appended {src} to sys.path')
 
 
 append_src_to_path(cd_project_root())
