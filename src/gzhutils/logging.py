@@ -1,5 +1,11 @@
 """
 Initializes the logging of this module
+
+Assumed and suggested usage case:
+Each logger has name the same as the module's runtime value of `__name__`.
+For each top-level package, only the logger with name the same as 
+the package name are configured with a handler, and the root logger 
+of a package should not propagate further root logger.
 """
 import io
 import sys
@@ -8,15 +14,23 @@ import logging
 import ctypes
 import tempfile
 import platform
-from typing import Self, Any, Mapping, Literal
-from contextlib import contextmanager
+from typing import (
+    Self, Any, Mapping, Literal, TextIO, TypedDict, Unpack, Sequence, Final
+)
+from contextlib import contextmanager, redirect_stdout
 
 
-DEFAULT_FORMATTER_STRING = \
+type Logger = logging.Logger
+type Level = int | str
+type Formatter = str | logging.Formatter
+type Handler = logging.Handler
+
+
+DEFAULT_FORMATTER_STRING: Final[str] = \
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
-LEVEL_MAP: Mapping[str, int] = {
+LEVEL_MAP: Final[Mapping[str, int]] = {
     "NOTSET": logging.NOTSET,
     "DEBUG": logging.DEBUG,
     "INFO": logging.INFO,
@@ -26,7 +40,7 @@ LEVEL_MAP: Mapping[str, int] = {
 }
 
 
-def _normalize_level(level: int | str) -> int:
+def _normalize_level(level: Level) -> int:
     if isinstance(level, str):
         level = level.upper()
         return LEVEL_MAP[level]
@@ -34,33 +48,85 @@ def _normalize_level(level: int | str) -> int:
         return level
 
 
+class LoggerOptions(TypedDict, total=False):
+    level: Level
+    propagate: bool
+    handlers: Sequence[Handler]
+    fmts: Sequence[Formatter]
+
+
+def _configure_logger(
+        logger: Logger, 
+        **options: Unpack[LoggerOptions]
+) -> None:
+    if (level := options.get("level")) is not None:
+        logger.setLevel(_normalize_level(level))
+
+    logger.propagate = options.get("propagate") or logger.propagate
+    
+    if (handlers := options.get("handlers")) is not None:
+        if len(old_handlers := logger.handlers.copy()):
+            for handler in old_handlers:
+                logger.removeHandler(handler)
+        
+        if (fmts := options.get("fmts")) is not None:
+            assert len(fmts) == len(handlers)
+        else:
+            fmts = (None for _ in handlers)
+
+        for handler, fmt in zip(handlers, fmts):
+            if isinstance(fmt, logging.Formatter):
+                handler.setFormatter(fmt)
+            else:
+                handler.setFormatter(logging.Formatter(fmt))
+
+
 def configure_logger(
-        logger: logging.Logger,
-        level: int | str = logging.WARNING,
+        logger: Logger,
+        level: Level = logging.WARNING,
         propagate: bool = False,
-        handler: logging.Handler = logging.StreamHandler(sys.stderr),
-        fmt: str = DEFAULT_FORMATTER_STRING
-) -> logging.Logger:
+        handlers: Sequence[Handler] = (logging.StreamHandler(sys.stderr),),
+        fmts: Sequence[Formatter] = (DEFAULT_FORMATTER_STRING,)
+) -> Logger:
     """
     Utility function mainly used to configure the root logger of a package.
     (distinguished by package name)
     """
-    logger.setLevel(_normalize_level(level))
-    # disable message propagation.
-    logger.propagate = propagate
-
-    handler.setFormatter(logging.Formatter(fmt))
-    logger.addHandler(handler)
+    _configure_logger(
+        logger, 
+        level=level, propagate=propagate, handlers=handlers, fmts=fmts
+    )
 
     logging.getLogger(__name__).info(
         f"Configured logger {logger} with options set to "
-        f"{level=}, {propagate=}, {handler=}, {fmt=}"
+        f"{level=}, {propagate=}, {handlers=}, {fmts=}"
     )
 
     return logger
 
 
-def get_log_functions(logger: logging.Logger):
+@contextmanager
+def logger_options(logger: Logger, **options: Unpack[LoggerOptions]):
+    backup: LoggerOptions = {}
+    for potential_key in LoggerOptions.__optional_keys__:
+        if potential_key in options:
+            match potential_key:
+                case "level" | "propagate":
+                    backup[potential_key] = getattr(logger, potential_key)
+                case "handler":
+                    backup["handlers"] = logger.handlers
+                case "fmt":
+                    backup["fmts"] = [
+                        handler.formatter or logging.Formatter()
+                        for handler in logger.handlers
+                    ]
+    
+    _configure_logger(logger, **options)
+    try: yield
+    finally: _configure_logger(logger, **backup)
+
+
+def get_log_functions(logger: Logger):
     return logger.debug, logger.info, logger.warning, logger.error
 
 
@@ -71,10 +137,10 @@ class VerboseLogger:
     def __init__(
             self: Self, 
             *package_names: str, 
-            level: int | str = logging.DEBUG
+            level: Level = logging.DEBUG
     ) -> None:
         self.level = _normalize_level(level)
-        self.loggers: list[logging.Logger] = []
+        self.loggers: list[Logger] = []
         self.level_baks: list[int] = []
         for package_name in package_names:
             logger = logging.getLogger(package_name)
@@ -161,9 +227,8 @@ def _get_all_stdout_redirector(
                 sys.stdout = stdout_bak
             tfile.flush()
             tfile.seek(0, io.SEEK_SET)
-            stream.write(b"C lib stdout:\n" + tfile.read())
-            stream.write(b"Python stdout:\n" + 
-                         bytes(sio.getvalue(), encoding='utf-8'))
+            stream.write(tfile.read())
+            stream.write(bytes(sio.getvalue(), encoding='utf-8'))
         finally:
             tfile.close()
             os.close(saved_c_stdout_fd)
@@ -173,8 +238,8 @@ def _get_all_stdout_redirector(
 
 @contextmanager
 def redirect_all_stdout(
-        logger_or_file: logging.Logger | io.TextIOBase,
-        level: int | str = logging.INFO
+        logger_or_file: Logger | io.TextIOBase,
+        level: Level = logging.INFO
 ):
     sys_name = platform.system()
     SUPPORTED_SYS_NAME = ("Windows", "Linux", "Darwin")
@@ -188,16 +253,34 @@ def redirect_all_stdout(
         yield
     captured_stdout = f.getvalue().decode("utf-8")
     
-    if isinstance(logger_or_file, logging.Logger):
+    if isinstance(logger_or_file, Logger):
         logger_or_file.log(_normalize_level(level), captured_stdout)
     elif isinstance(logger_or_file, io.TextIOBase):
         print(captured_stdout, end='', file=logger_or_file)
     else:
         raise TypeError(
             "Invalid target type. "
-            "Expected io.TextIOBase or logging.Logger, "
+            "Expected io.TextIOBase or Logger, "
             f"got {logger_or_file.__class__.__name__} instead."
         )
+
+
+class LoggerFile(TextIO):
+    def __init__(self: Self, logger: Logger, level: Level) -> None:
+        self.logger = logger
+        self.level = level
+    
+    def write(self, msg: str):
+        self.logger.log(_normalize_level(self.level), msg)
+    
+    def flush(self):
+        pass
+
+
+@contextmanager
+def redirect_stdout_to_logger(logger: Logger, level: Level):
+    with redirect_stdout(LoggerFile(logger, level)):
+        yield
 
 
 # configure the logger for this package.
