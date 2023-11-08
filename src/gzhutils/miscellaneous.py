@@ -1,8 +1,8 @@
 import warnings
-from typing import Callable, Self
+from typing import Callable, Self, Any, Mapping
 from functools import wraps
 from pathlib import Path
-from threading import Timer
+from threading import main_thread, Thread, Event
 
 
 def deprecated[**P, R](func: Callable[P, R]) -> Callable[P, R]:
@@ -34,51 +34,33 @@ def get_project_root() -> Path:
     return path
 
 
-class InfiniteTimer[**P]:
-    interval: float
-    callback: Callable[P, None]
-    timer: Timer | None
-    should_stop: bool
-
+class InfiniteTimer[**P](Thread):
     def __init__(
             self: Self, 
             interval: float,
-            callback: Callable[P, None],
+            callback: Callable[P, None]
     ) -> None:
+        """
+        Please call `setargs` to set args and kwargs of the callback before 
+        calling `start` of this thread.
+        """
+        super().__init__()
         self.interval = interval
         self.callback = callback
 
-        self.timer = None
-        self.should_stop = False
+        self._should_stop = Event()
 
-    def function(self: Self, *args: P.args, **kwargs: P.kwargs) -> None:
-        self.callback(*args, **kwargs)
-
-        if self.should_stop:
-            return
-        
-        self.timer = Timer(
-            interval=self.interval,
-            function=self.function,
-            args=args,
-            kwargs=kwargs
-        )
-        self.timer.start()
-
-
-    def run(self: Self, *args: P.args, **kwargs: P.kwargs) -> Self:
-        self.timer = Timer(
-            interval=self.interval,
-            function=self.function,
-            args=args,
-            kwargs=kwargs
-        )
-        self.timer.start()
+    def run(self: Self) -> None:
+        while True:
+            self.callback(*self._args, **self._kwargs)
+            if self._should_stop.wait(timeout=self.interval):
+                break
+    
+    def setargs(self: Self, *args: P.args, **kwargs: P.kwargs) -> Self:
+        self._args = args
+        self._kwargs = kwargs
 
         return self
 
     def stop(self: Self) -> None:
-        if self.timer is None:
-            raise RuntimeError("Please run before stop.")
-        self.should_stop = True
-        self.timer.cancel()
+        self._should_stop.set()

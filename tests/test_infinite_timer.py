@@ -13,10 +13,11 @@ def test_infinite_timer():
 
     inf_timer = InfiniteTimer(
         interval=0.1,
-        callback=callback
-    ).run(1, 2)
+        callback=callback,
+    ).setargs(1, 2)
+    inf_timer.start()
 
-    time.sleep(1.09)
+    time.sleep(0.99)
     inf_timer.stop()
     
     assert count == 1023
