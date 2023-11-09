@@ -16,14 +16,15 @@ import tempfile
 import platform
 from typing import (
     Self, Any, Mapping, Literal, TextIO, TypedDict, Unpack, Sequence, Final,
-    Callable
+    Callable, Generator
 )
+from pathlib import Path
 from contextlib import contextmanager, redirect_stdout
 
 from .miscellaneous import InfiniteTimer
 
 
-type Logger = logging.Logger
+type LoggerLike = logging.Logger | str
 type Level = int | str
 type Formatter = str | logging.Formatter
 type Handler = logging.Handler
@@ -50,6 +51,12 @@ def _normalize_level(level: Level) -> int:
     else:
         return level
 
+def _normalize_logger(logger: LoggerLike) -> logging.Logger:
+    if isinstance(logger, str):
+        return logging.getLogger(logger)
+    else:
+        return logger
+
 
 class LoggerOptions(TypedDict, total=False):
     level: Level
@@ -59,9 +66,10 @@ class LoggerOptions(TypedDict, total=False):
 
 
 def _configure_logger(
-        logger: Logger, 
+        logger_like: LoggerLike, 
         **options: Unpack[LoggerOptions]
 ) -> None:
+    logger = _normalize_logger(logger_like)
     if (level := options.get("level")) is not None:
         logger.setLevel(_normalize_level(level))
 
@@ -86,12 +94,12 @@ def _configure_logger(
 
 
 def configure_logger(
-        logger: Logger,
+        logger: LoggerLike,
         level: Level = logging.WARNING,
         propagate: bool = False,
         handlers: Sequence[Handler] = (logging.StreamHandler(sys.stderr),),
         fmts: Sequence[Formatter] = (DEFAULT_FORMATTER_STRING,)
-) -> Logger:
+) -> logging.Logger:
     """
     Utility function mainly used to configure the root logger of a package.
     (distinguished by package name)
@@ -106,11 +114,13 @@ def configure_logger(
         f"{level=}, {propagate=}, {handlers=}, {fmts=}"
     )
 
-    return logger
+    return _normalize_logger(logger)
 
 
 @contextmanager
-def logger_options(logger: Logger, **options: Unpack[LoggerOptions]):
+def logger_options(logger_like: LoggerLike, **options: Unpack[LoggerOptions]):
+    logger = _normalize_logger(logger_like)
+
     backup: LoggerOptions = {}
     for potential_key in LoggerOptions.__optional_keys__:
         if potential_key in options:
@@ -130,7 +140,8 @@ def logger_options(logger: Logger, **options: Unpack[LoggerOptions]):
     finally: _configure_logger(logger, **backup)
 
 
-def get_log_functions(logger: Logger):
+def get_log_functions(logger_like: LoggerLike):
+    logger = _normalize_logger(logger_like)
     return logger.debug, logger.info, logger.warning, logger.error
 
 
@@ -144,7 +155,7 @@ class VerboseLogger:
             level: Level = logging.DEBUG
     ) -> None:
         self.level = _normalize_level(level)
-        self.loggers: list[Logger] = []
+        self.loggers: list[logging.Logger] = []
         self.level_baks: list[int] = []
         for package_name in package_names:
             logger = logging.getLogger(package_name)
@@ -158,6 +169,27 @@ class VerboseLogger:
     def __exit__(self: Self, *args: Any):
         for logger, level in zip(self.loggers, self.level_baks):
             logger.setLevel(level)
+
+
+@contextmanager
+def add_file_handler_to_loggers(
+        filepath: Path, 
+        *loggers: LoggerLike,
+        fmt: str = DEFAULT_FORMATTER_STRING
+) -> Generator[None, None, None]:
+    # None, None, None
+    # yield, send, return
+    handler = logging.FileHandler(filepath)
+    handler.setFormatter(logging.Formatter(fmt))
+            
+    for logger in (_normalize_logger(logger) for logger in loggers):
+        logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        for logger in loggers:
+            _normalize_logger(logger).removeHandler(handler)
+        handler.close()
 
 
 def _get_all_stdout_redirector(
@@ -242,7 +274,7 @@ def _get_all_stdout_redirector(
 
 @contextmanager
 def redirect_all_stdout(
-        logger_or_file: Logger | io.TextIOBase,
+        logger_or_file: LoggerLike | io.TextIOBase,
         level: Level = logging.INFO
 ):
     sys_name = platform.system()
@@ -272,11 +304,11 @@ def redirect_all_stdout(
 class _LoggerFile(TextIO):
     def __init__(
             self: Self, 
-            logger: Logger, 
+            logger_like: logging.Logger, 
             level: Level,
             write_to_stdout: bool = False
     ) -> None:
-        self.logger = logger
+        self.logger = _normalize_logger(logger_like)
         self.level = level
         self.write_to_stdout = write_to_stdout
 
@@ -294,29 +326,38 @@ class _LoggerFile(TextIO):
 
 @contextmanager
 def redirect_stdout_to_logger(
-        logger: Logger, 
+        logger_like: LoggerLike, 
         level: Level,
         keep_stdout: bool = False
 ):
-    with redirect_stdout(
-            _LoggerFile(logger, level, write_to_stdout=keep_stdout)
-    ):
+    with redirect_stdout(_LoggerFile(_normalize_logger(logger_like), 
+                                     level, 
+                                     write_to_stdout=keep_stdout)):
         yield
 
 
+@contextmanager
 def log_msg_each_interval(
-        logger: Logger, 
+        logger_like: LoggerLike, 
         interval: float = 60,
         level: Level = logging.INFO,
         msg: str = "I am alive"
 ):
-    def callback(logger: Logger, level: Level, msg: str) -> None:
+    def callback(logger: logging.Logger, level: Level, msg: str) -> None:
         logger.log(_normalize_level(level), msg)
     
-    return InfiniteTimer(
+    inf_timer = InfiniteTimer(
         interval=interval,
         callback=callback,
-    ).run(logger, level, msg)
+    ).setargs(_normalize_logger(logger_like), level, msg)
+    inf_timer.start()
+
+    try:
+        yield inf_timer
+    finally:
+        inf_timer.stop()
+        inf_timer.join()
+
 
 
 # configure the logger for this package.

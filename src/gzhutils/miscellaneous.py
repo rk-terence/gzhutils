@@ -3,6 +3,7 @@ from typing import Callable, Self, Any, Mapping
 from functools import wraps
 from pathlib import Path
 from threading import main_thread, Thread, Event
+from functools import cache
 
 
 def deprecated[**P, R](func: Callable[P, R]) -> Callable[P, R]:
@@ -15,6 +16,7 @@ def deprecated[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return deprecated_func
 
 
+@cache
 def get_project_root() -> Path:
     # this is absolute.
     path = Path.cwd()
