@@ -1,5 +1,8 @@
 # pyright: strict
-from typing import Callable, Any
+from typing import (
+    Callable, Any, SupportsIndex, Protocol, overload, Sequence, Iterator,
+    runtime_checkable
+)
 
 
 def with_signature_of[**P, R](
@@ -19,6 +22,25 @@ def typed_args_kwargs[**P](func: Callable[P, Any]):
         return args, kwargs
     
     return f
+
+
+@runtime_checkable
+class SequenceNotStr[T](Protocol):
+    """
+    See this thread for information and rationale behind this:
+    https://github.com/python/typing/issues/256#issuecomment-1442633430
+    """
+    @overload
+    def __getitem__(self, index: SupportsIndex, /) -> T: ...
+    @overload
+    def __getitem__(self, index: slice, /) -> Sequence[T]: ...
+    # __contains__ in str is incompatible with this
+    def __contains__(self, value: object, /) -> bool: ...
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[T]: ...
+    def index(self, value: Any, /, start: int = 0, stop: int = ...) -> int: ...
+    def count(self, value: Any, /) -> int: ...
+    def __reversed__(self) -> Iterator[T]: ...
 
 
 if __name__ == "__main__":
