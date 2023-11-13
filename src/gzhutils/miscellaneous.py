@@ -100,7 +100,7 @@ def get_all_stdout_redirector(
         else:
             libc = ctypes.CDLL('api-ms-win-crt-stdio-l1-1-0')
         # c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
-        kernel32 = ctypes.WinDLL('kernel32')
+        kernel32 = ctypes.WinDLL('kernel32')  # type: ignore
         STD_OUTPUT_HANDLE = -11
         c_stdout = kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
     elif sys_name == "Linux":
@@ -152,3 +152,35 @@ def get_all_stdout_redirector(
             os.close(saved_c_stdout_fd)
     
     return all_stdout_redirector
+
+
+def postprocessing_decorator_factory[**P, R1, R2](
+        post_func: Callable[[R1], R2]
+) -> Callable[[Callable[P, R1]], Callable[P, R2]]:
+    def decorator(
+            func: Callable[P, R1]
+    ) -> Callable[P, R2]:
+        def func_with_postprocessing(
+                *args: P.args,
+                **kwargs: P.kwargs
+        ) -> R2:
+            ret = func(*args, **kwargs)
+            return post_func(ret)
+        
+        return func_with_postprocessing
+    
+    return decorator
+
+
+def cascade_decorators[**inP1, inR1, **outP1, outR1, **outP2, outR2](
+        decorator_1: Callable[[Callable[inP1, inR1]], 
+                              Callable[outP1, outR1]],
+        decorator_2: Callable[[Callable[outP1, outR1]], 
+                              Callable[outP2, outR2]],
+) -> Callable[[Callable[inP1, inR1]], Callable[outP2, outR2]]:
+    def decorator(
+            func: Callable[inP1, inR1]
+    ) -> Callable[outP2, outR2]:
+        return decorator_2(decorator_1(func))
+    
+    return decorator

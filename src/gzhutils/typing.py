@@ -1,6 +1,7 @@
 # pyright: strict
 from typing import (
-    Callable, Any, SupportsIndex, Protocol, overload, Sequence, Iterator,
+    Callable, Any, SupportsIndex, Protocol, overload, Sequence, Iterator, 
+    Self, Iterable, Sized,
     runtime_checkable
 )
 
@@ -22,6 +23,22 @@ def typed_args_kwargs[**P](func: Callable[P, Any]):
         return args, kwargs
     
     return f
+
+
+@runtime_checkable
+class SupportsGetItem[T](Protocol):
+    def __getitem__(self: Self, __key: SupportsIndex) -> T: ...
+
+
+@runtime_checkable
+class SequenceProto[T](Iterable[T], Sized, SupportsGetItem[T], Protocol):
+    """
+    __iter__, __len__, and __getitem__ should be present.
+
+    Note that this lacks some methods from collections.abc.Sequence,
+    __contains__, __reversed__, index and count.
+    """
+    pass
 
 
 @runtime_checkable
