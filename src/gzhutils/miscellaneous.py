@@ -4,15 +4,15 @@ import sys
 import ctypes
 import tempfile
 import warnings
-from typing import Callable, Self, Any, Mapping, Literal
+import typing as t
 from functools import wraps
 from pathlib import Path
-from threading import main_thread, Thread, Event
+from threading import Thread, Event
 from functools import cache
 from contextlib import contextmanager
 
 
-def deprecated[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+def deprecated[**P, R](func: t.Callable[P, R]) -> t.Callable[P, R]:
     @wraps(func)
     def deprecated_func(*args: P.args, **kwargs: P.kwargs) -> R:
         warnings.warn(f"Call to deprecated function {func.__name__}",
@@ -44,9 +44,9 @@ def get_project_root() -> Path:
 
 class InfiniteTimer[**P](Thread):
     def __init__(
-            self: Self, 
+            self: t.Self, 
             interval: float,
-            callback: Callable[P, None]
+            callback: t.Callable[P, None]
     ) -> None:
         """
         Please call `setargs` to set args and kwargs of the callback before 
@@ -58,24 +58,24 @@ class InfiniteTimer[**P](Thread):
 
         self._should_stop = Event()
 
-    def run(self: Self) -> None:
+    def run(self: t.Self) -> None:
         while True:
             self.callback(*self._args, **self._kwargs)
             if self._should_stop.wait(timeout=self.interval):
                 break
     
-    def setargs(self: Self, *args: P.args, **kwargs: P.kwargs) -> Self:
+    def setargs(self: t.Self, *args: P.args, **kwargs: P.kwargs) -> t.Self:
         self._args = args
         self._kwargs = kwargs
 
         return self
 
-    def stop(self: Self) -> None:
+    def stop(self: t.Self) -> None:
         self._should_stop.set()
 
 
 def get_all_stdout_redirector(
-        sys_name: Literal["Linux", "Windows", "Darwin"]
+        sys_name: t.Literal["Linux", "Windows", "Darwin"]
 ):
     """ 
     Copied and modified from 
@@ -155,11 +155,11 @@ def get_all_stdout_redirector(
 
 
 def postprocessing_decorator_factory[**P, R1, R2](
-        post_func: Callable[[R1], R2]
-) -> Callable[[Callable[P, R1]], Callable[P, R2]]:
+        post_func: t.Callable[[R1], R2]
+) -> t.Callable[[t.Callable[P, R1]], t.Callable[P, R2]]:
     def decorator(
-            func: Callable[P, R1]
-    ) -> Callable[P, R2]:
+            func: t.Callable[P, R1]
+    ) -> t.Callable[P, R2]:
         def func_with_postprocessing(
                 *args: P.args,
                 **kwargs: P.kwargs
@@ -173,14 +173,14 @@ def postprocessing_decorator_factory[**P, R1, R2](
 
 
 def cascade_decorators[**inP1, inR1, **outP1, outR1, **outP2, outR2](
-        decorator_1: Callable[[Callable[inP1, inR1]], 
-                              Callable[outP1, outR1]],
-        decorator_2: Callable[[Callable[outP1, outR1]], 
-                              Callable[outP2, outR2]],
-) -> Callable[[Callable[inP1, inR1]], Callable[outP2, outR2]]:
+        decorator_1: t.Callable[[t.Callable[inP1, inR1]], 
+                                 t.Callable[outP1, outR1]],
+        decorator_2: t.Callable[[t.Callable[outP1, outR1]], 
+                                 t.Callable[outP2, outR2]],
+) -> t.Callable[[t.Callable[inP1, inR1]], t.Callable[outP2, outR2]]:
     def decorator(
-            func: Callable[inP1, inR1]
-    ) -> Callable[outP2, outR2]:
+            func: t.Callable[inP1, inR1]
+    ) -> t.Callable[outP2, outR2]:
         return decorator_2(decorator_1(func))
     
     return decorator

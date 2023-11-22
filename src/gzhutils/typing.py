@@ -1,63 +1,66 @@
 # pyright: strict
-from typing import (
-    Callable, Any, SupportsIndex, Protocol, overload, Sequence, Iterator, 
-    Self, Iterable, Sized,
-    runtime_checkable
-)
+import typing as t
 
 
 def with_signature_of[**P, R](
-        func: Callable[P, R]
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+        func: t.Callable[P, R]
+) -> t.Callable[[t.Callable[P, R]], t.Callable[P, R]]:
     return lambda f: f
 
 
-def with_params_of[**P](func: Callable[P, Any]):
-    def decorate[R](f: Callable[P, R]) -> Callable[P, R]:
+def with_params_of[**P](ref_func: t.Callable[P, t.Any]):
+    def decorate[R](f: t.Callable[P, R]) -> t.Callable[P, R]:
         return f
     return decorate
 
 
-def typed_args_kwargs[**P](func: Callable[P, Any]):
+def typed_args_kwargs[**P](ref_func: t.Callable[P, t.Any]):
     def f(*args: P.args, **kwargs: P.kwargs):
         return args, kwargs
     
     return f
 
 
-@runtime_checkable
-class SupportsGetItem[T](Protocol):
-    def __getitem__(self: Self, __key: SupportsIndex) -> T: ...
+@t.runtime_checkable
+class SupportsGetItem[T](t.Protocol):
+    def __getitem__(self: t.Self, __key: t.SupportsIndex, /) -> T: ...
 
 
-@runtime_checkable
-class SequenceProto[T](Iterable[T], Sized, SupportsGetItem[T], Protocol):
+@t.runtime_checkable
+class SupportsReversed[T](t.Protocol):
+    def __reversed__(self: t.Self) -> t.Iterator[T]: ...
+
+
+@t.runtime_checkable
+class SupportsIndexing(t.Protocol):
     """
-    __iter__, __len__, and __getitem__ should be present.
-
-    Note that this lacks some methods from collections.abc.Sequence,
-    __contains__, __reversed__, index and count.
+    Note that this is different from typing.SupportsIndex
     """
+    def index(self: t.Self, _1: t.Any, /) -> int:
+        ...
+
+
+@t.runtime_checkable
+class SupportsCounting(t.Protocol):
+    def count(self: t.Self, __value: t.Any, /) -> int:
+        ...
+
+
+@t.runtime_checkable
+class CollectionProto[T](t.Iterable[T], t.Sized, t.Protocol):
+    def __contains__(self: t.Self, __key: object, /) -> bool: ...
+
+
+@t.runtime_checkable
+class SequenceProto[T](
+        CollectionProto[T], 
+        SupportsGetItem[T], 
+        SupportsReversed[T],
+        SupportsIndexing,
+        SupportsCounting,
+        t.Protocol
+):
     pass
-
-
-@runtime_checkable
-class SequenceNotStr[T](Protocol):
-    """
-    See this thread for information and rationale behind this:
-    https://github.com/python/typing/issues/256#issuecomment-1442633430
-    """
-    @overload
-    def __getitem__(self, index: SupportsIndex, /) -> T: ...
-    @overload
-    def __getitem__(self, index: slice, /) -> Sequence[T]: ...
-    # __contains__ in str is incompatible with this
-    def __contains__(self, value: object, /) -> bool: ...
-    def __len__(self) -> int: ...
-    def __iter__(self) -> Iterator[T]: ...
-    def index(self, value: Any, /, start: int = 0, stop: int = ...) -> int: ...
-    def count(self, value: Any, /) -> int: ...
-    def __reversed__(self) -> Iterator[T]: ...
 
 
 if __name__ == "__main__":
@@ -65,13 +68,13 @@ if __name__ == "__main__":
         return float(b) + a
     
     @with_params_of(f)
-    def g1(*args: Any, **kwargs: Any):
+    def g1(*args: t.Any, **kwargs: t.Any):
         return b"133"
     
     a = g1(1, '123')
 
     @with_signature_of(f)
-    def g2(*args: Any, **kwrags: Any):
+    def g2(*args: t.Any, **kwrags: t.Any):
         return 123.
     
     b = g2(1, '123')

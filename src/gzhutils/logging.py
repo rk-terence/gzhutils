@@ -11,10 +11,7 @@ import io
 import sys
 import logging
 import platform
-from typing import (
-    Self, Any, Mapping, Literal, TextIO, TypedDict, Unpack, Sequence, Final,
-    Callable, Generator
-)
+import typing as t
 from pathlib import Path
 from contextlib import contextmanager, redirect_stdout
 
@@ -27,11 +24,11 @@ type Formatter = str | logging.Formatter
 type Handler = logging.Handler
 
 
-DEFAULT_FORMATTER_STRING: Final[str] = \
+DEFAULT_FORMATTER_STRING: t.Final[str] = \
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
-LEVEL_MAP: Final[Mapping[str, int]] = {
+LEVEL_MAP: t.Final[t.Mapping[str, int]] = {
     "NOTSET": logging.NOTSET,
     "DEBUG": logging.DEBUG,
     "INFO": logging.INFO,
@@ -55,16 +52,16 @@ def _normalize_logger(logger: LoggerLike) -> logging.Logger:
         return logger
 
 
-class LoggerOptions(TypedDict, total=False):
+class LoggerOptions(t.TypedDict, total=False):
     level: LevelLike
     propagate: bool
-    handlers: Sequence[Handler]
-    fmts: Sequence[Formatter]
+    handlers: t.Sequence[Handler]
+    fmts: t.Sequence[Formatter]
 
 
 def _configure_logger(
         logger_like: LoggerLike, 
-        **options: Unpack[LoggerOptions]
+        **options: t.Unpack[LoggerOptions]
 ) -> None:
     logger = _normalize_logger(logger_like)
     if (level := options.get("level")) is not None:
@@ -94,8 +91,8 @@ def configure_logger(
         logger: LoggerLike,
         level: LevelLike = logging.WARNING,
         propagate: bool = False,
-        handlers: Sequence[Handler] = (logging.StreamHandler(sys.stderr),),
-        fmts: Sequence[Formatter] = (DEFAULT_FORMATTER_STRING,)
+        handlers: t.Sequence[Handler] = (logging.StreamHandler(sys.stderr),),
+        fmts: t.Sequence[Formatter] = (DEFAULT_FORMATTER_STRING,)
 ) -> logging.Logger:
     """
     Utility function mainly used to configure the root logger of a package.
@@ -115,7 +112,7 @@ def configure_logger(
 
 
 @contextmanager
-def logger_options(logger_like: LoggerLike, **options: Unpack[LoggerOptions]):
+def logger_options(logger_like: LoggerLike, **options: t.Unpack[LoggerOptions]):
     logger = _normalize_logger(logger_like)
 
     backup: LoggerOptions = {}
@@ -147,7 +144,7 @@ class VerboseLogger:
     Context manager to temporarily change one or several loggers' level.
     """
     def __init__(
-            self: Self, 
+            self: t.Self, 
             *package_names: str, 
             level: LevelLike = logging.DEBUG
     ) -> None:
@@ -159,11 +156,11 @@ class VerboseLogger:
             self.loggers.append(logger)
             self.level_baks.append(logger.level)
     
-    def __enter__(self: Self):
+    def __enter__(self: t.Self):
         for logger in self.loggers:
             logger.setLevel(self.level)
     
-    def __exit__(self: Self, *args: Any):
+    def __exit__(self: t.Self, *args: t.Any):
         for logger, level in zip(self.loggers, self.level_baks):
             logger.setLevel(level)
 
@@ -173,7 +170,7 @@ def add_file_handler_to_loggers(
         filepath: Path, 
         *loggers: LoggerLike,
         fmt: str = DEFAULT_FORMATTER_STRING
-) -> Generator[None, None, None]:
+) -> t.Generator[None, None, None]:
     # None, None, None
     # yield, send, return
     handler = logging.FileHandler(filepath)
@@ -218,9 +215,9 @@ def redirect_all_stdout(
         )
 
 
-class _LoggerFile(TextIO):
+class _LoggerFile(t.TextIO):
     def __init__(
-            self: Self, 
+            self: t.Self, 
             logger_like: logging.Logger, 
             level: LevelLike,
             write_to_stdout: bool = False

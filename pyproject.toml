@@ -17,6 +17,10 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: Implementation :: CPython"
 ]
+dependencies = [
+  "matplotlib >= 3.8.2",
+  "numpy >= 1.26.2"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/rk-terence/gzhutils"
