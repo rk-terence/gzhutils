@@ -1,3 +1,4 @@
+import logging
 import typing as t
 from contextlib import contextmanager
 
@@ -5,12 +6,16 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 
-@t.type_check_only
+logger = logging.getLogger(__name__)
+
+
 class VisOptions(t.TypedDict, total=False):
     figsize: tuple[float, float]
+    figratio: float
     font: str
-    fontsize: float
-    dpi: int
+    fontsize: float  # matplotlib default is 10 (pt)
+    dpi: int  # fig dpi, matplotlib default is 100
+    savedpi: int  # save.dpi, matplotlib default is figure.dpi
     tight_layout: bool
     bbox_inches: str
     # scatter plots
@@ -21,11 +26,12 @@ class VisOptions(t.TypedDict, total=False):
 
 
 _DEFAULT_OPTIONS: VisOptions = {
-    "figsize": (8, 4),
+    "figratio": 2,
     "font": "Times New Roman",
     "fontsize": 10,  # this is also the default of matplotlib
-    "dpi": 600,
     "tight_layout": True,
+    "dpi": 100,
+    "savedpi": 600,
     "bbox_inches": "tight",
     # Scatter plot
     "s": 3,
@@ -43,7 +49,7 @@ _options: VisOptions = {}
 
 def set_options(**options: t.Unpack[VisOptions]):
     for key, value in options.items():
-        assert key in _DEFAULT_OPTIONS, f"Unknown option: {key}"
+        assert key in VisOptions.__optional_keys__, f"Unknown option: {key}"
         _options[key] = value
 
 
@@ -87,7 +93,7 @@ def run_with_context[**P](
 ):
     def wrap(func: t.Callable[P, Figure]) -> t.Callable[P, Figure]:
         def func_with_context(*args: P.args, **kwargs: P.kwargs) -> Figure:
-            with _rc_context(**options) as rc:
+            with _rc_context(**options) as (_, rc):
                 fig = func(*args, **kwargs)
                 if rc.get("show", True):
                     plt.show()
@@ -105,49 +111,60 @@ def run_with_context[**P](
 @contextmanager
 def _rc_context(
         **options: t.Unpack[VisOptions]
-) -> t.Generator[dict[str, t.Any], None, None]:
+) -> t.Generator[tuple[dict[str, t.Any], VisOptions], None, None]:
     options = _DEFAULT_OPTIONS | options | _options
-    rc = _vis_options_to_plt_rc_params(**options)
-    with plt.rc_context(rc=rc):
-        yield rc
+    mpl_rc, rc = _vis_options_to_rc_params(**options)
+    with plt.rc_context(rc=mpl_rc):
+        yield mpl_rc, rc
 
 
 @contextmanager
 def rc_context(
         **options: t.Unpack[VisOptions]
-) -> t.Generator[dict[str, t.Any], None, None]:
+) -> t.Generator[tuple[dict[str, t.Any], VisOptions], None, None]:
     """
     useful when using the matplotlib API directly.
     """
     options = _DEFAULT_OPTIONS | _options | options
-    rc = _vis_options_to_plt_rc_params(**options)
-    with plt.rc_context(rc=rc):
-        yield rc
+    mpl_rc, rc = _vis_options_to_rc_params(**options)
+    with plt.rc_context(rc=mpl_rc):
+        yield mpl_rc, rc
 
 
-def _vis_options_to_plt_rc_params(
+def _vis_options_to_rc_params(
         **options: t.Unpack[VisOptions]
-) -> dict[str, t.Any]:
-    rc: dict[str, t.Any] = {}
+) -> tuple[dict[str, t.Any], VisOptions]:
+    mpl_rc: dict[str, t.Any] = {}
+    rc: VisOptions = {}
     for key, value in options.items():
         match key:
             case "figsize":
-                rc["figure.figsize"] = value
+                mpl_rc["figure.figsize"] = value
+                logger.warning(
+                    "Option 'figsize' is deprecated and preceded by "
+                    "'figratio'. Consider use 'figratio' instead.")
+            case "figratio":
+                w, h = 6.4, 6.4 / t.cast(float, value)
+                mpl_rc["figure.figsize"] = (w, h)
             case "font":
-                rc["font.family"] = value
+                mpl_rc["font.family"] = value
             case "fontsize":
-                rc["font.size"] = value
+                mpl_rc["font.size"] = value
             case "dpi":
-                rc["savefig.dpi"] = value
+                mpl_rc["figure.dpi"] = value
+            case "savedpi":
+                mpl_rc["savefig.dpi"] = value
             case "tight_layout":
-                rc["figure.autolayout"] = value
+                mpl_rc["figure.autolayout"] = value
             case "bbox_inches":
-                rc["savefig.bbox"] = value
+                mpl_rc["savefig.bbox"] = value
             case "s":
-                rc["lines.markersize"] = value
+                mpl_rc["lines.markersize"] = value
             case "show" | "clear":
-                pass
+                # These are not matplotlib rc params,
+                # and processed in `run_with_context`.
+                rc[key] = t.cast(t.Any, value)
             case _:
                 raise ValueError(f"Unknown option: {key}")
     
-    return rc
+    return mpl_rc, rc

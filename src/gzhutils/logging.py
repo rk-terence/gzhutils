@@ -88,7 +88,7 @@ def _configure_logger(
 
 
 def configure_logger(
-        logger: LoggerLike,
+        logger_like: LoggerLike,
         level: LevelLike = logging.WARNING,
         propagate: bool = False,
         handlers: t.Sequence[Handler] = (logging.StreamHandler(sys.stderr),),
@@ -99,16 +99,18 @@ def configure_logger(
     (distinguished by package name)
     """
     _configure_logger(
-        logger, 
+        logger_like, 
         level=level, propagate=propagate, handlers=handlers, fmts=fmts
     )
 
-    logging.getLogger(__name__).info(
-        f"Configured logger {logger} with options set to "
+    logging.getLogger(__name__).log(
+        logging.WARNING if PACKAGE_NAME != logger_like 
+            else logging.INFO,
+        f"Configured logger {logger_like} with options set to "
         f"{level=}, {propagate=}, {handlers=}, {fmts=}"
     )
 
-    return _normalize_logger(logger)
+    return _normalize_logger(logger_like)
 
 
 @contextmanager
@@ -276,4 +278,4 @@ def log_msg_each_interval(
 
 # configure the logger for this package.
 PACKAGE_NAME = '.'.join(__name__.split('.')[:-1])
-configure_logger(logging.getLogger(PACKAGE_NAME), level=logging.INFO)
+configure_logger(logging.getLogger(PACKAGE_NAME), level=logging.WARNING)

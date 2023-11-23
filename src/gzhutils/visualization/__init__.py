@@ -1,17 +1,18 @@
-from .draw_funcs import plot, scatter, parity_plot, plot_loss_func
-from .options_context import VisOptionsContext, set_options, rc_context
-from .utils import huber_loss, epsilon_insensitive_loss, piecewise_linear_loss
+from .draw_funcs import (
+    plot_one, plot_multiple, plot_consecutive,
+    scatter_one, scatter_multiple, scatter_consecutive,
+    parity_plot
+)
+from .options_context import (
+    VisOptions, VisOptionsContext, set_options, rc_context
+)
+from .utils import AxesKwargs, FigureKwargs
 
 
 __all__ = [
-    "plot",
-    "scatter",
+    "plot_one", "plot_multiple", "plot_consecutive",
+    "scatter_one", "scatter_multiple", "scatter_consecutive",
     "parity_plot",
-    "plot_loss_func",
-    "VisOptionsContext",
-    "set_options",
-    "rc_context",
-    "huber_loss",
-    "epsilon_insensitive_loss",
-    "piecewise_linear_loss",
+    "VisOptionsContext", "set_options", "rc_context",
+    "VisOptions", "AxesKwargs", "FigureKwargs"
 ]

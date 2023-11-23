@@ -13,7 +13,9 @@ class AxesKwargs(t.TypedDict, total=False):
     yticks: SequenceProto[float]
     xlabel: str
     ylabel: str
+    aspect: t.Literal["equal", "auto"] | float  # a number represents (h / w)
     legend: bool  # default True
+    title: str
 
 
 def handle_axes_kwargs(axes: Axes, /, **kwargs: t.Unpack[AxesKwargs]):
@@ -29,9 +31,12 @@ def handle_axes_kwargs(axes: Axes, /, **kwargs: t.Unpack[AxesKwargs]):
         axes.set_xlabel(xlabel)
     if ylabel := kwargs.get("ylabel"):
         axes.set_ylabel(ylabel)
-    
+    if aspect := kwargs.get("aspect"):
+        axes.set_aspect(aspect)
     if kwargs.get("legend", True):
         axes.legend()
+    if title := kwargs.get("title"):
+        axes.set_title(title)
 
 
 class FigureKwargs(t.TypedDict, total=False):
