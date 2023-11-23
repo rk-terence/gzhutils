@@ -17,9 +17,12 @@ class VisOptions(t.TypedDict, total=False):
     dpi: int  # fig dpi, matplotlib default is 100
     savedpi: int  # save.dpi, matplotlib default is figure.dpi
     tight_layout: bool
-    bbox_inches: str
-    # scatter plots
-    s: float
+    bbox_inches: t.Literal["tight", "standard"]
+    # math
+    mathfont: t.Literal["dejavusans", "dejavuserif", "stix", "stixsans", "cm"]
+    # plot
+    linewidth: float
+    markersize: float  # s in scatter is by default markersize ** 2
     # global fig options not controlled by plt.rc_context
     show: bool
     clear: bool
@@ -33,8 +36,11 @@ _DEFAULT_OPTIONS: VisOptions = {
     "dpi": 100,
     "savedpi": 600,
     "bbox_inches": "tight",
-    # Scatter plot
-    "s": 3,
+    "mathfont": "cm",
+    # plot
+    "linewidth": 2,
+    "markersize": 6,
+    # my options
     "show": True,
     "clear": True
 }
@@ -121,14 +127,14 @@ def _rc_context(
 @contextmanager
 def rc_context(
         **options: t.Unpack[VisOptions]
-) -> t.Generator[tuple[dict[str, t.Any], VisOptions], None, None]:
+) -> t.Generator[dict[str, t.Any], None, None]:
     """
     useful when using the matplotlib API directly.
     """
     options = _DEFAULT_OPTIONS | _options | options
-    mpl_rc, rc = _vis_options_to_rc_params(**options)
+    mpl_rc, _ = _vis_options_to_rc_params(**options)
     with plt.rc_context(rc=mpl_rc):
-        yield mpl_rc, rc
+        yield mpl_rc
 
 
 def _vis_options_to_rc_params(
@@ -158,7 +164,11 @@ def _vis_options_to_rc_params(
                 mpl_rc["figure.autolayout"] = value
             case "bbox_inches":
                 mpl_rc["savefig.bbox"] = value
-            case "s":
+            case "mathfont":
+                mpl_rc["mathtext.fontset"] = value
+            case "linewidth":
+                mpl_rc["lines.linewidth"] = value
+            case "markersize":
                 mpl_rc["lines.markersize"] = value
             case "show" | "clear":
                 # These are not matplotlib rc params,

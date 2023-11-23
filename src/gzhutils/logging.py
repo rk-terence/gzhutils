@@ -104,7 +104,7 @@ def configure_logger(
     )
 
     logging.getLogger(__name__).log(
-        logging.WARNING if PACKAGE_NAME != logger_like 
+        logging.WARNING if _PACKAGE_NAME != logger_like 
             else logging.INFO,
         f"Configured logger {logger_like} with options set to "
         f"{level=}, {propagate=}, {handlers=}, {fmts=}"
@@ -277,5 +277,5 @@ def log_msg_each_interval(
 
 
 # configure the logger for this package.
-PACKAGE_NAME = '.'.join(__name__.split('.')[:-1])
-configure_logger(logging.getLogger(PACKAGE_NAME), level=logging.WARNING)
+_PACKAGE_NAME = '.'.join(__name__.split('.')[:-1])
+configure_logger(_PACKAGE_NAME, level=logging.WARNING)
