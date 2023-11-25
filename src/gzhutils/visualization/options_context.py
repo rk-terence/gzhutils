@@ -1,9 +1,12 @@
 import logging
 import typing as t
+from collections.abc import Callable
 from contextlib import contextmanager
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+
+from .. import typing as mt
 
 
 logger = logging.getLogger(__name__)
@@ -78,41 +81,40 @@ class VisOptionsContext:
         _options = self._options_bak
 
 
+def __run_with_context[**P](func: Callable[P, Figure],
+                            options: VisOptions,
+                            *args: P.args, **kwargs: P.kwargs) -> Figure:
+    with _rc_context(**options) as (_, rc):
+        fig = func(*args, **kwargs)
+        if rc.get("show", True):
+            plt.show()
+        if rc.get("clear", True):
+            fig.clear()
+    return fig
+
+
 @t.overload
 def run_with_context[**P](
-        func: None = None,
         **options: t.Unpack[VisOptions]
-) -> t.Callable[[t.Callable[P, Figure]], t.Callable[P, Figure]]:
-    ...
-@t.overload
-def run_with_context[**P](
-        func: t.Callable[P, Figure],
-        **options: t.Unpack[VisOptions]
-) -> t.Callable[P, Figure]:
-    ...
-def run_with_context[**P](
-        func: t.Callable[P, Figure] | None = None, 
-        **options: t.Unpack[VisOptions]
-) -> (
-        t.Callable[P, Figure] 
-        | t.Callable[[t.Callable[P, Figure]], t.Callable[P, Figure]]
-):
-    def wrap(func: t.Callable[P, Figure]) -> t.Callable[P, Figure]:
+) -> Callable[[Callable[P, Figure]], Callable[P, Figure]]:
+    def wrap(func: t.Callable[P, Figure]) -> Callable[P, Figure]:
         def func_with_context(*args: P.args, **kwargs: P.kwargs) -> Figure:
-            with _rc_context(**options) as (_, rc):
-                fig = func(*args, **kwargs)
-                if rc.get("show", True):
-                    plt.show()
-                if rc.get("clear", True):
-                    fig.clear()
-            return fig
+            return __run_with_context(func, options, *args, **kwargs)
         return func_with_context
-    
-    if func is None:
-        return wrap
-    else:
-        return wrap(func)
-    
+    return wrap
+
+
+@t.overload
+def run_with_context[**P](func: Callable[P, Figure]) -> Callable[P, Figure]:
+    def func_with_context(*args: P.args, **kwargs: P.kwargs) -> Figure:
+        return __run_with_context(func, {}, *args, **kwargs)
+    return func_with_context 
+
+
+@mt.overload
+def run_with_context(*args: t.Any, **kwargs: t.Any) -> t.Any:
+    ...
+
 
 @contextmanager
 def _rc_context(
@@ -142,7 +144,9 @@ def _vis_options_to_rc_params(
 ) -> tuple[dict[str, t.Any], VisOptions]:
     mpl_rc: dict[str, t.Any] = {}
     rc: VisOptions = {}
+    annos = t.get_type_hints(VisOptions)
     for key, value in options.items():
+        value = mt.check(annos[key], value)
         match key:
             case "figsize":
                 mpl_rc["figure.figsize"] = value
@@ -150,7 +154,7 @@ def _vis_options_to_rc_params(
                     "Option 'figsize' is deprecated and preceded by "
                     "'figratio'. Consider use 'figratio' instead.")
             case "figratio":
-                w, h = 6.4, 6.4 / t.cast(float, value)
+                w, h = 6.4, 6.4 / value
                 mpl_rc["figure.figsize"] = (w, h)
             case "font":
                 mpl_rc["font.family"] = value
@@ -173,7 +177,7 @@ def _vis_options_to_rc_params(
             case "show" | "clear":
                 # These are not matplotlib rc params,
                 # and processed in `run_with_context`.
-                rc[key] = t.cast(t.Any, value)
+                rc[key] = value
             case _:
                 raise ValueError(f"Unknown option: {key}")
     
