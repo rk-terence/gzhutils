@@ -1,7 +1,6 @@
 import shutil
+import functools
 from pathlib import Path
-
-from .miscellaneous import get_project_root
 
 
 type PathLike = Path | str
@@ -16,3 +15,23 @@ def clear_dir(path: PathLike) -> None:
             shutil.rmtree(entry)
         else:
             entry.unlink()
+
+
+@functools.cache
+def get_project_root() -> Path:
+    # this is absolute.
+    path = Path.cwd()
+    found = False
+    while not found:
+        iter = filter(
+            lambda x: x.name in ('src', '.git'), 
+            path.glob('*')
+        )
+        try:
+            next(iter); next(iter)
+        except StopIteration:
+            path = path.parent
+        else:
+            found = True
+    
+    return path

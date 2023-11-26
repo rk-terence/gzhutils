@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 import logging
 
-from .miscellaneous import get_project_root
+from .path import get_project_root
 
 
 logger = logging.getLogger(__name__)

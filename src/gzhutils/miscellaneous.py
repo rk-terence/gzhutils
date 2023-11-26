@@ -8,7 +8,6 @@ import typing as t
 from functools import wraps
 from pathlib import Path
 from threading import Thread, Event
-from functools import cache
 from contextlib import contextmanager
 
 
@@ -20,26 +19,6 @@ def deprecated[**P, R](func: t.Callable[P, R]) -> t.Callable[P, R]:
                       stacklevel=2)
         return func(*args, **kwargs)
     return deprecated_func
-
-
-@cache
-def get_project_root() -> Path:
-    # this is absolute.
-    path = Path.cwd()
-    found = False
-    while not found:
-        iter = filter(
-            lambda x: x.name in ('src', '.git'), 
-            path.glob('*')
-        )
-        try:
-            next(iter); next(iter)
-        except StopIteration:
-            path = path.parent
-        else:
-            found = True
-    
-    return path
 
 
 class InfiniteTimer[**P](Thread):
