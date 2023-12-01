@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gzhutils"
-version = "1.5.1"
+version = "1.5.2"
 authors = [
   { name="rkzhai", email="rkzhai7@gmail.com" },
 ]
@@ -17,7 +17,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: Implementation :: CPython"
 ]
-dependencies = [
+
+[project.optional-dependencies]
+vis = [
   "matplotlib >= 3.8.2",
   "numpy >= 1.26.2"
 ]
