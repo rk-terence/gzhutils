@@ -130,6 +130,28 @@ def overload(func: Callable[..., t.Any]) -> Callable[..., t.Any]:
     return func_to_run
 
 
+class _NotSetMeta(t._ProtocolMeta):  # type: ignore
+    def __bool__(self: t.Self) -> bool:
+        # make the NotSet class Falsey
+        return False
+    
+    def __eq__(self: t.Self, other: object) -> bool:
+        # NotSet is not equal to anything
+        return False
+    
+    def __str__(self: t.Self) -> str:
+        return "NotSet"
+
+
+class NotSet(t.Protocol, metaclass=_NotSetMeta):
+    @staticmethod
+    def _not_set__() -> None: ...
+
+
+def isNotSet(x: t.Any) -> t.TypeGuard[NotSet]:
+    return x is NotSet
+
+
 @t.runtime_checkable
 class SupportsGetItem[T](t.Protocol):
     def __getitem__(self: t.Self, __key: t.SupportsIndex, /) -> T: ...
@@ -173,6 +195,8 @@ class SequenceProto[T](
 
 
 if __name__ == "__main__":
+    print(bool(NotSet))
+
     def f(a: int, b: str) -> float:
         return float(b) + a
     
